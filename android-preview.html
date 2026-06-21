@@ -1,0 +1,1557 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vibe Writing Android Preview</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f8f4ec;
+      --paper-soft: #f5eee1;
+      --surface: #fffaf2;
+      --ink: #1d1814;
+      --muted: #6a6057;
+      --line: #d7cdc2;
+      --rust: #b45309;
+      --rust-soft: #f7e4d2;
+      --shadow: 0 20px 56px rgba(47, 34, 22, 0.16);
+      --sans: "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
+      --serif: "Noto Serif SC", "Songti SC", serif;
+    }
+
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --paper: #171411;
+      --paper-soft: #211d19;
+      --surface: #29241f;
+      --ink: #f4ece3;
+      --muted: #b9aea4;
+      --line: #4b423a;
+      --rust: #df8b48;
+      --rust-soft: #452b1b;
+      --shadow: 0 20px 56px rgba(0, 0, 0, 0.38);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: var(--sans);
+    }
+
+    button, input, textarea { font: inherit; }
+
+    button {
+      border: 0;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .preview-shell {
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    .device {
+      width: min(1320px, 100%);
+      min-height: 100vh;
+      margin: 0 auto;
+      background: var(--paper);
+      overflow: hidden;
+    }
+
+    .status-bar {
+      display: flex;
+      height: 30px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-icons {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .app-bar {
+      display: flex;
+      height: 64px;
+      align-items: center;
+      gap: 12px;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--paper);
+    }
+
+    .article-drawer-scrim {
+      position: fixed;
+      z-index: 12;
+      inset: 0;
+      background: rgba(20, 17, 14, 0.42);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease;
+    }
+
+    .article-drawer-scrim.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .article-drawer {
+      display: flex;
+      width: min(380px, 85vw);
+      height: 100%;
+      flex-direction: column;
+      padding: 22px 18px;
+      background: var(--paper);
+      box-shadow: 18px 0 50px rgba(0, 0, 0, 0.18);
+      transform: translateX(-102%);
+      transition: transform 200ms ease;
+    }
+
+    .article-drawer-scrim.is-open .article-drawer { transform: translateX(0); }
+
+    .drawer-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .drawer-head h2 {
+      flex: 1;
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .new-article {
+      min-height: 40px;
+      padding: 0 14px;
+      border-radius: 20px;
+      color: #fff;
+      background: var(--rust);
+      font-weight: 700;
+    }
+
+    .article-search {
+      width: 100%;
+      height: 44px;
+      margin: 16px 0 10px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      outline: 0;
+      color: var(--ink);
+      background: var(--surface);
+    }
+
+    .article-list {
+      display: grid;
+      gap: 6px;
+      overflow-y: auto;
+    }
+
+    .article-item {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 6px 11px 12px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      background: var(--surface);
+      text-align: left;
+    }
+
+    .article-item:hover {
+      border-color: var(--line);
+      background: color-mix(in srgb, var(--surface) 82%, var(--rust-soft));
+    }
+
+    .article-item.is-current {
+      border-color: var(--rust);
+      background: color-mix(in srgb, var(--surface) 88%, var(--rust-soft));
+    }
+
+    .article-item-copy {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .article-item strong {
+      display: block;
+      overflow: hidden;
+      color: var(--ink);
+      font-size: 14px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .article-item small {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .article-more {
+      width: 38px;
+      height: 38px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      color: var(--muted);
+      font-size: 20px;
+    }
+
+    .article-actions-menu {
+      position: absolute;
+      z-index: 2;
+      top: 48px;
+      right: 4px;
+      display: none;
+      width: 112px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
+    }
+
+    .article-actions-menu.is-open { display: grid; }
+
+    .article-actions-menu button {
+      min-height: 36px;
+      padding: 0 10px;
+      border-radius: 8px;
+      color: var(--ink);
+      text-align: left;
+    }
+
+    .article-actions-menu button:hover { background: var(--rust-soft); }
+    .article-actions-menu .danger { color: #a54235; }
+
+    .brand-mark {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      place-items: center;
+      border-radius: 12px;
+      color: #fff;
+      background: var(--rust);
+    }
+
+    .brand-mark svg,
+    .icon-button svg,
+    .format-toolbar svg {
+      width: 22px;
+      height: 22px;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.8;
+    }
+
+    .app-title {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .app-title strong {
+      display: block;
+      font-family: var(--serif);
+      font-size: 21px;
+      line-height: 1.2;
+    }
+
+    .app-title span {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .icon-button {
+      position: relative;
+      display: grid;
+      width: 44px;
+      height: 44px;
+      place-items: center;
+      border-radius: 50%;
+      color: var(--ink);
+      background: transparent;
+    }
+
+    .icon-button:hover,
+    .icon-button:focus-visible {
+      background: color-mix(in srgb, var(--ink) 8%, transparent);
+      outline: 0;
+    }
+
+    .icon-button:active { background: color-mix(in srgb, var(--ink) 13%, transparent); }
+
+    .workspace {
+      display: grid;
+      min-height: calc(100vh - 180px);
+      grid-template-columns: minmax(0, 1fr);
+      gap: 12px;
+      padding: 14px;
+    }
+
+    .panel {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--paper-soft);
+      overflow: hidden;
+    }
+
+    .editor-panel {
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+    }
+
+    .document-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .title-input {
+      min-width: 0;
+      flex: 1;
+      padding: 10px 4px;
+      border: 0;
+      outline: 0;
+      color: var(--ink);
+      background: transparent;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .word-count {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .word-count::before {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      margin-right: 6px;
+      border-radius: 50%;
+      background: #4d7c52;
+      content: "";
+    }
+
+    .content-input {
+      width: 100%;
+      min-height: 430px;
+      flex: 1;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      outline: 0;
+      color: var(--ink);
+      background: var(--surface);
+      font-family: var(--serif);
+      font-size: 17px;
+      line-height: 2;
+      overflow: auto;
+    }
+
+    .content-input:focus { border-color: var(--rust); }
+
+    .content-input:empty::before {
+      color: var(--muted);
+      content: attr(data-placeholder);
+      pointer-events: none;
+    }
+
+    .content-input h2 {
+      margin: 0.9em 0 0.35em;
+      font-size: 1.55em;
+      line-height: 1.45;
+    }
+
+    .content-input img {
+      display: block;
+      max-width: min(100%, 720px);
+      max-height: 480px;
+      margin: 18px auto;
+      border-radius: 10px;
+      object-fit: contain;
+    }
+
+    .format-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 8px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface);
+      overflow-x: auto;
+    }
+
+    .format-toolbar button,
+    .format-toolbar label {
+      display: inline-grid;
+      min-width: 38px;
+      height: 36px;
+      flex: 0 0 auto;
+      place-items: center;
+      padding: 0 10px;
+      border-radius: 8px;
+      color: var(--ink);
+      background: transparent;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .format-toolbar button:hover,
+    .format-toolbar label:hover {
+      color: var(--rust);
+      background: var(--rust-soft);
+    }
+
+    .format-toolbar button.is-active {
+      color: var(--rust);
+      background: var(--rust-soft);
+    }
+
+    .format-toolbar .tool-icon {
+      padding: 0;
+    }
+
+    .format-toolbar .tool-icon svg {
+      width: 19px;
+      height: 19px;
+    }
+
+    .format-toolbar .divider {
+      width: 1px;
+      height: 22px;
+      flex: 0 0 auto;
+      margin: 0 4px;
+      background: var(--line);
+    }
+
+    .format-toolbar input { display: none; }
+
+    .suggestion {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 10px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      color: var(--muted);
+      background: var(--surface);
+      font-family: var(--serif);
+      font-size: 14px;
+    }
+
+    .suggestion-content {
+      display: grid;
+      min-width: 0;
+      flex: 1;
+      gap: 4px;
+    }
+
+    .suggestion-label {
+      color: var(--rust);
+      font-family: var(--sans);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    .suggestion-accept {
+      display: inline-flex;
+      min-height: 36px;
+      flex: 0 0 auto;
+      align-items: center;
+      gap: 6px;
+      padding: 0 12px;
+      border-radius: 18px;
+      color: var(--rust);
+      background: var(--rust-soft);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .suggestion-accept:hover {
+      color: #fff;
+      background: var(--rust);
+    }
+
+    .recording-panel {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      margin-top: 10px;
+      padding: 12px 14px;
+      border: 1px solid color-mix(in srgb, var(--rust) 55%, var(--line));
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--surface) 84%, var(--rust-soft));
+    }
+
+    .recording-panel.is-open { display: flex; }
+
+    .recording-pulse {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--rust);
+    }
+
+    .recording-pulse span {
+      width: 5px;
+      height: 18px;
+      border-radius: 999px;
+      background: currentColor;
+      animation: voice-wave 780ms ease-in-out infinite;
+    }
+
+    .recording-pulse span:nth-child(2) { animation-delay: 120ms; }
+    .recording-pulse span:nth-child(3) { animation-delay: 240ms; }
+
+    @keyframes voice-wave {
+      0%, 100% { transform: scaleY(0.45); opacity: 0.62; }
+      50% { transform: scaleY(1); opacity: 1; }
+    }
+
+    .recording-copy {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .recording-copy strong {
+      display: block;
+      font-size: 13px;
+    }
+
+    .recording-copy small {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .recording-stop {
+      min-height: 36px;
+      padding: 0 14px;
+      border-radius: 18px;
+      color: #fff;
+      background: var(--rust);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .stats {
+      display: none;
+    }
+
+    .context-panel {
+      position: relative;
+      height: 100%;
+      padding: 16px;
+      border: 0;
+      border-radius: 0;
+      background: var(--paper);
+    }
+
+    .context-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .context-head h2 {
+      margin: 0;
+      font-size: 17px;
+    }
+
+    .context-head-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .collapse-context {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      place-items: center;
+      border-radius: 50%;
+      color: var(--muted);
+      background: transparent;
+      font-size: 20px;
+    }
+
+    .collapse-context:hover {
+      color: var(--rust);
+      background: var(--rust-soft);
+    }
+
+    .context-copy {
+      margin: 10px 0 16px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    .reference-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      font-size: 13px;
+    }
+
+    .reference-card input { accent-color: var(--rust); }
+
+    .empty-reference {
+      padding: 28px 12px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+    }
+
+    .context-drawer-scrim {
+      position: fixed;
+      z-index: 12;
+      inset: 0;
+      background: rgba(20, 17, 14, 0.42);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease;
+    }
+
+    .context-drawer-scrim.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .context-drawer {
+      width: min(400px, 88vw);
+      height: 100%;
+      margin-left: auto;
+      background: var(--paper);
+      box-shadow: -18px 0 50px rgba(0, 0, 0, 0.18);
+      transform: translateX(102%);
+      transition: transform 200ms ease;
+    }
+
+    .context-drawer-scrim.is-open .context-drawer { transform: translateX(0); }
+
+    .scrim {
+      position: fixed;
+      z-index: 10;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(20, 17, 14, 0.42);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 160ms ease;
+    }
+
+    .scrim.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .dialog {
+      width: min(440px, 100%);
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      padding: 24px;
+      border-radius: 28px;
+      background: var(--surface);
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
+      transform: translateY(10px) scale(0.98);
+      transition: transform 160ms ease;
+    }
+
+    .scrim.is-open .dialog { transform: translateY(0) scale(1); }
+
+    .dialog-icon {
+      display: grid;
+      width: 44px;
+      height: 44px;
+      margin-bottom: 18px;
+      place-items: center;
+      border-radius: 14px;
+      color: var(--rust);
+      background: var(--rust-soft);
+    }
+
+    .dialog h2 {
+      margin: 0;
+      font-size: 23px;
+    }
+
+    .dialog p {
+      margin: 9px 0 20px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .field {
+      position: relative;
+      padding-top: 8px;
+    }
+
+    .field label {
+      position: absolute;
+      z-index: 1;
+      top: 0;
+      left: 14px;
+      padding: 0 5px;
+      color: var(--rust);
+      background: var(--surface);
+      font-size: 11px;
+    }
+
+    .field-row {
+      display: flex;
+      align-items: center;
+      border: 1.5px solid var(--rust);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .field input {
+      width: 100%;
+      min-width: 0;
+      height: 52px;
+      padding: 0 14px;
+      border: 0;
+      outline: 0;
+      color: var(--ink);
+      background: transparent;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .style-field {
+      margin-top: 20px;
+    }
+
+    .style-field textarea {
+      width: 100%;
+      min-height: 112px;
+      resize: vertical;
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      outline: 0;
+      color: var(--ink);
+      background: var(--paper-soft);
+      font: 14px/1.65 var(--sans);
+    }
+
+    .style-field textarea:focus {
+      border-color: var(--rust);
+      box-shadow: 0 0 0 3px var(--rust-soft);
+    }
+
+    .style-field small {
+      display: block;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.55;
+    }
+
+    .field-row button {
+      width: 48px;
+      height: 48px;
+      color: var(--muted);
+      background: transparent;
+    }
+
+    .dialog-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .theme-setting {
+      margin-bottom: 22px;
+    }
+
+    .setting-label {
+      display: block;
+      margin-bottom: 10px;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .theme-options {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .theme-option {
+      display: grid;
+      min-height: 72px;
+      place-items: center;
+      gap: 4px;
+      padding: 9px 6px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      color: var(--muted);
+      background: var(--paper-soft);
+      font-size: 12px;
+    }
+
+    .theme-option span:first-child {
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .theme-option.is-selected {
+      border: 2px solid var(--rust);
+      color: var(--rust);
+      background: var(--rust-soft);
+    }
+
+    .dialog-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 22px;
+    }
+
+    .dialog-actions button {
+      min-height: 42px;
+      padding: 0 18px;
+      border-radius: 21px;
+      color: var(--rust);
+      background: transparent;
+      font-weight: 700;
+    }
+
+    .dialog-actions .save {
+      color: #fff;
+      background: var(--rust);
+    }
+
+    .toast {
+      position: fixed;
+      z-index: 20;
+      bottom: 28px;
+      left: 50%;
+      padding: 12px 18px;
+      border-radius: 8px;
+      color: #fff;
+      background: #34302c;
+      font-size: 13px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, 10px);
+      transition: 180ms ease;
+    }
+
+    .toast.is-visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    @media (max-width: 760px) {
+      .preview-shell { padding: 0; }
+      .device {
+        width: 100%;
+        min-height: 100vh;
+      }
+      .workspace {
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+      }
+      .suggestion { align-items: flex-start; }
+      .suggestion-accept span { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-shell">
+    <main id="device" class="device">
+      <div class="status-bar">
+        <span>9:41</span>
+        <span class="status-icons"><span>▰</span><span>⌁</span><span>▱</span></span>
+      </div>
+
+      <header class="app-bar">
+        <button id="articles-button" class="icon-button" type="button" aria-label="文章列表" title="文章列表">
+          <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/><path d="M4 16h4v4"/></svg>
+        </span>
+        <div class="app-title">
+          <strong>Vibe Writing</strong>
+          <span>智能写作工作台</span>
+        </div>
+        <button id="copy-button" class="icon-button" type="button" aria-label="复制 Markdown" title="复制 Markdown">
+          <svg viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+        </button>
+        <button id="context-button" class="icon-button" type="button" aria-label="写作上下文" title="写作上下文">
+          <svg viewBox="0 0 24 24"><path d="M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>
+        </button>
+        <button id="settings-button" class="icon-button" type="button" aria-label="设置" title="设置">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.1A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.1A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.16.38.37.72.66 1 .3.28.7.42 1.1.4H21v4h-.1A1.7 1.7 0 0 0 19.4 15Z"/></svg>
+        </button>
+      </header>
+
+      <section class="workspace">
+        <section class="panel editor-panel">
+          <div class="document-row">
+            <input id="title" class="title-input" placeholder="无标题文章" aria-label="文章标题">
+            <span id="save-state" class="word-count">字数 0</span>
+          </div>
+          <div class="format-toolbar" aria-label="文字格式">
+            <button type="button" data-command="undo" aria-label="撤销">↶</button>
+            <button type="button" data-command="redo" aria-label="重做">↷</button>
+            <span class="divider" aria-hidden="true"></span>
+            <button type="button" data-command="bold" aria-label="加粗">B</button>
+            <button type="button" data-command="italic" aria-label="斜体"><em>I</em></button>
+            <button type="button" data-block="h2" aria-label="标题">标题</button>
+            <button type="button" data-command="insertUnorderedList" aria-label="项目列表">列表</button>
+            <button type="button" data-command="removeFormat" aria-label="清除格式">清除</button>
+            <span class="divider" aria-hidden="true"></span>
+            <label class="tool-icon" for="local-image" aria-label="插入本地图片" title="插入图片">
+              <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 2-2 5 5"/></svg>
+            </label>
+            <input id="local-image" type="file" accept="image/*">
+            <button id="voice-button" class="tool-icon" type="button" aria-label="语音输入" title="语音输入">
+              <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>
+            </button>
+          </div>
+          <div id="content" class="content-input" contenteditable="true" role="textbox" aria-label="正文" aria-multiline="true" data-placeholder="输入正文，或使用上方工具插入格式和本地图片。"></div>
+          <div id="recording-panel" class="recording-panel" aria-live="polite">
+            <div class="recording-pulse" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div class="recording-copy">
+              <strong id="recording-title">正在语音输入</strong>
+              <small id="recording-time">00:00，点击停止后会按你的文风润色</small>
+            </div>
+            <button id="stop-recording" class="recording-stop" type="button">停止并润色</button>
+          </div>
+          <div class="suggestion">
+            <div class="suggestion-content">
+              <span class="suggestion-label">AI 续写</span>
+              <span>建议会显示在这里，满意时直接插入正文。</span>
+            </div>
+            <button id="accept-suggestion" class="suggestion-accept" type="button"><span>插入正文</span> →</button>
+          </div>
+          <div id="stats" class="stats"></div>
+        </section>
+
+      </section>
+    </main>
+  </div>
+
+  <div id="article-drawer-scrim" class="article-drawer-scrim" aria-hidden="true">
+    <aside class="article-drawer" aria-label="文章列表">
+      <div class="drawer-head">
+        <h2>我的文章</h2>
+        <button id="new-article" class="new-article" type="button">新建文章</button>
+      </div>
+      <input id="article-search" class="article-search" type="search" placeholder="搜索文章" aria-label="搜索文章">
+      <div id="article-list" class="article-list"></div>
+    </aside>
+  </div>
+
+  <div id="context-drawer-scrim" class="context-drawer-scrim" aria-hidden="true">
+    <aside class="context-drawer" aria-label="写作上下文">
+      <section class="context-panel">
+        <div class="context-head">
+          <h2>写作上下文</h2>
+          <div class="context-head-actions">
+            <button class="action" type="button">添加文件</button>
+            <button id="close-context" class="collapse-context" type="button" aria-label="关闭写作上下文" title="关闭">›</button>
+          </div>
+        </div>
+        <div class="context-body">
+          <p class="context-copy">勾选的文本文件会参与当前文章续写。支持 txt、md、html、json 和 csv。</p>
+          <div class="empty-reference">还没有参考文件</div>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <div id="settings-scrim" class="scrim" aria-hidden="true">
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="dialog-icon" aria-hidden="true">⚙</div>
+      <h2 id="settings-title">设置</h2>
+      <p>调整应用外观并配置智谱服务。</p>
+      <div class="theme-setting">
+        <span class="setting-label">外观</span>
+        <div class="theme-options" role="radiogroup" aria-label="外观模式">
+          <button class="theme-option" type="button" data-theme-value="system" role="radio" aria-checked="true">
+            <span aria-hidden="true">◐</span><span>跟随系统</span>
+          </button>
+          <button class="theme-option" type="button" data-theme-value="light" role="radio" aria-checked="false">
+            <span aria-hidden="true">☀</span><span>浅色</span>
+          </button>
+          <button class="theme-option" type="button" data-theme-value="dark" role="radio" aria-checked="false">
+            <span aria-hidden="true">☾</span><span>深色</span>
+          </button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="api-key">智谱 API Key</label>
+        <div class="field-row">
+          <input id="api-key" type="password" autocomplete="off" placeholder="请输入 API Key">
+          <button id="toggle-key" type="button" aria-label="显示 API Key">显示</button>
+        </div>
+      </div>
+      <div class="style-field">
+        <label class="setting-label" for="style-prompt">文风约束</label>
+        <textarea id="style-prompt" maxlength="2000" placeholder="例如：语言克制、句子简短，多用具体案例，不使用营销腔，不要替我总结观点。"></textarea>
+        <small>同时用于 AI 续写和语音底稿润色，优先遵守这里填写的表达规则。</small>
+      </div>
+      <div class="dialog-note">
+        <span aria-hidden="true">●</span>
+        <span>预览版只把 Key 保存在当前浏览器中。Android App 使用系统 Keystore 加密保存。</span>
+      </div>
+      <div class="dialog-actions">
+        <button id="clear-key" type="button">清除</button>
+        <button id="cancel-settings" type="button">取消</button>
+        <button id="save-settings" class="save" type="button">保存</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script>
+    (function () {
+      var device = document.getElementById("device");
+      var articlesButton = document.getElementById("articles-button");
+      var articleDrawerScrim = document.getElementById("article-drawer-scrim");
+      var articleList = document.getElementById("article-list");
+      var articleSearch = document.getElementById("article-search");
+      var contextButton = document.getElementById("context-button");
+      var contextDrawerScrim = document.getElementById("context-drawer-scrim");
+      var settingsButton = document.getElementById("settings-button");
+      var settingsScrim = document.getElementById("settings-scrim");
+      var apiKey = document.getElementById("api-key");
+      var stylePrompt = document.getElementById("style-prompt");
+      var toggleKey = document.getElementById("toggle-key");
+      var saveState = document.getElementById("save-state");
+      var content = document.getElementById("content");
+      var title = document.getElementById("title");
+      var stats = document.getElementById("stats");
+      var toast = document.getElementById("toast");
+      var recordingPanel = document.getElementById("recording-panel");
+      var recordingTitle = document.getElementById("recording-title");
+      var recordingTime = document.getElementById("recording-time");
+      var stopRecording = document.getElementById("stop-recording");
+      var storageKey = "vibe-writing-preview-api-key";
+      var themeStorageKey = "vibe-writing-preview-theme";
+      var styleStorageKey = "vibe-writing-preview-style-prompt";
+      var documentStorageKey = "vibe-writing-preview-document";
+      var articlesStorageKey = "vibe-writing-preview-articles";
+      var currentArticleStorageKey = "vibe-writing-preview-current-article";
+      var selectedTheme = localStorage.getItem(themeStorageKey) || "system";
+      var toastTimer;
+      var draftSaveTimer;
+      var savedSelection = null;
+      var articles = [];
+      var currentArticleId = "";
+      var recordingStartedAt = 0;
+      var recordingTimer = null;
+      var recordingActive = false;
+
+      function makeArticle(seed) {
+        var now = Date.now();
+        return {
+          id: "article-" + now + "-" + Math.random().toString(36).slice(2, 8),
+          title: seed && seed.title || "",
+          html: seed && seed.html || "",
+          createdAt: seed && seed.createdAt || now,
+          updatedAt: seed && seed.updatedAt || now
+        };
+      }
+
+      function loadArticles() {
+        try {
+          articles = JSON.parse(localStorage.getItem(articlesStorageKey) || "[]");
+        } catch (error) {
+          articles = [];
+        }
+        if (!articles.length) {
+          var legacy = null;
+          try { legacy = JSON.parse(localStorage.getItem(documentStorageKey) || "null"); } catch (error) {}
+          articles = [makeArticle(legacy || {})];
+        }
+        currentArticleId = localStorage.getItem(currentArticleStorageKey) || articles[0].id;
+        if (!articles.some(function (article) { return article.id === currentArticleId; })) {
+          currentArticleId = articles[0].id;
+        }
+        persistArticles();
+      }
+
+      function currentArticle() {
+        return articles.find(function (article) { return article.id === currentArticleId; }) || articles[0];
+      }
+
+      function persistArticles() {
+        localStorage.setItem(articlesStorageKey, JSON.stringify(articles));
+        localStorage.setItem(currentArticleStorageKey, currentArticleId);
+      }
+
+      function articleWordCount(article) {
+        var holder = document.createElement("div");
+        holder.innerHTML = article.html || "";
+        return holder.innerText.replace(/\s+/g, "").length;
+      }
+
+      function formatArticleTime(value) {
+        return new Intl.DateTimeFormat("zh-CN", {
+          month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"
+        }).format(new Date(value));
+      }
+
+      function renderArticleList(query) {
+        articleList.innerHTML = "";
+        articles.slice().sort(function (a, b) { return b.updatedAt - a.updatedAt; })
+          .filter(function (article) {
+            return !query || (article.title + " " + article.html).toLowerCase().includes(query.toLowerCase());
+          })
+          .forEach(function (article) {
+            var row = document.createElement("div");
+            row.className = "article-item" + (article.id === currentArticleId ? " is-current" : "");
+            row.innerHTML =
+              '<button class="article-item-copy" type="button"><strong>' +
+              (article.id === currentArticleId ? "●　" : "") +
+              escapeHtml(article.title || "无标题文章") +
+              '</strong><small>' + formatArticleTime(article.updatedAt) + "　" +
+              articleWordCount(article) + ' 字</small></button>' +
+              '<button class="article-more" type="button" aria-label="文章操作">⋮</button>' +
+              '<div class="article-actions-menu">' +
+              '<button type="button" data-article-action="rename">重命名</button>' +
+              '<button type="button" data-article-action="duplicate">复制</button>' +
+              '<button class="danger" type="button" data-article-action="delete">删除</button>' +
+              '</div>';
+            row.querySelector(".article-item-copy").addEventListener("click", function () {
+              switchArticle(article.id);
+              closeArticleDrawer();
+            });
+            row.querySelector(".article-more").addEventListener("click", function () {
+              var menu = row.querySelector(".article-actions-menu");
+              document.querySelectorAll(".article-actions-menu.is-open").forEach(function (other) {
+                if (other !== menu) other.classList.remove("is-open");
+              });
+              menu.classList.toggle("is-open");
+            });
+            row.querySelectorAll("[data-article-action]").forEach(function (button) {
+              button.addEventListener("click", function () {
+                manageArticle(article, button.getAttribute("data-article-action"));
+              });
+            });
+            articleList.appendChild(row);
+          });
+      }
+
+      function escapeHtml(value) {
+        return value.replace(/[&<>"']/g, function (character) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character];
+        });
+      }
+
+      function openArticleDrawer() {
+        saveDraftState();
+        renderArticleList(articleSearch.value.trim());
+        articleDrawerScrim.classList.add("is-open");
+        articleDrawerScrim.setAttribute("aria-hidden", "false");
+      }
+
+      function closeArticleDrawer() {
+        articleDrawerScrim.classList.remove("is-open");
+        articleDrawerScrim.setAttribute("aria-hidden", "true");
+      }
+
+      function switchArticle(id) {
+        saveDraftState();
+        currentArticleId = id;
+        persistArticles();
+        restoreDocument();
+        renderArticleList(articleSearch.value.trim());
+      }
+
+      function manageArticle(article, action) {
+        if (action === "rename") {
+          var nextTitle = window.prompt("文章标题", article.title || "无标题文章");
+          if (nextTitle !== null) article.title = nextTitle.trim();
+        } else if (action === "duplicate") {
+          var copy = makeArticle(article);
+          copy.title = (article.title || "无标题文章") + " 副本";
+          copy.createdAt = Date.now();
+          copy.updatedAt = Date.now();
+          articles.unshift(copy);
+        } else if (action === "delete" && window.confirm("删除后无法恢复，确定删除吗？")) {
+          articles = articles.filter(function (item) { return item.id !== article.id; });
+          if (!articles.length) articles.push(makeArticle({}));
+          if (currentArticleId === article.id) {
+            currentArticleId = articles[0].id;
+            restoreDocument();
+          }
+        }
+        article.updatedAt = Date.now();
+        persistArticles();
+        renderArticleList(articleSearch.value.trim());
+      }
+
+      function resolvedTheme(value) {
+        if (value !== "system") return value;
+        return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+
+      function applyTheme(value) {
+        selectedTheme = value;
+        document.documentElement.setAttribute("data-theme", resolvedTheme(value));
+        document.querySelectorAll("[data-theme-value]").forEach(function (button) {
+          var active = button.getAttribute("data-theme-value") === value;
+          button.classList.toggle("is-selected", active);
+          button.setAttribute("aria-checked", active ? "true" : "false");
+        });
+      }
+
+      function openSettings() {
+        apiKey.value = localStorage.getItem(storageKey) || "";
+        stylePrompt.value = localStorage.getItem(styleStorageKey) || "";
+        selectedTheme = localStorage.getItem(themeStorageKey) || "system";
+        applyTheme(selectedTheme);
+        apiKey.type = "password";
+        toggleKey.textContent = "显示";
+        settingsScrim.classList.add("is-open");
+        settingsScrim.setAttribute("aria-hidden", "false");
+        setTimeout(function () { apiKey.focus(); }, 80);
+      }
+
+      function closeSettings() {
+        settingsScrim.classList.remove("is-open");
+        settingsScrim.setAttribute("aria-hidden", "true");
+        settingsButton.focus();
+      }
+
+      function showToast(message) {
+        clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.classList.add("is-visible");
+        toastTimer = setTimeout(function () {
+          toast.classList.remove("is-visible");
+        }, 1600);
+      }
+
+      function formatDuration(milliseconds) {
+        var total = Math.max(0, Math.floor(milliseconds / 1000));
+        var minutes = String(Math.floor(total / 60)).padStart(2, "0");
+        var seconds = String(total % 60).padStart(2, "0");
+        return minutes + ":" + seconds;
+      }
+
+      function startRecordingPreview() {
+        recordingActive = true;
+        recordingStartedAt = Date.now();
+        recordingTitle.textContent = "正在语音输入";
+        stopRecording.style.display = "";
+        recordingPanel.classList.add("is-open");
+        document.getElementById("voice-button").classList.add("is-active");
+        clearInterval(recordingTimer);
+        recordingTimer = setInterval(function () {
+          recordingTime.textContent = formatDuration(Date.now() - recordingStartedAt) + "，点击停止后会按你的文风润色";
+        }, 250);
+      }
+
+      function stopRecordingPreview() {
+        recordingActive = false;
+        clearInterval(recordingTimer);
+        recordingTitle.textContent = "正在转写并润色";
+        recordingTime.textContent = "请稍等，完成后会插入正文";
+        stopRecording.style.display = "none";
+        document.getElementById("voice-button").classList.remove("is-active");
+        setTimeout(function () {
+          recordingPanel.classList.remove("is-open");
+          stopRecording.style.display = "";
+          showToast("原生 App 中会插入润色后的语音内容");
+        }, 1400);
+      }
+
+      function updateStats() {
+        var count = content.innerText.replace(/\s+/g, "").length;
+        saveState.textContent = "字数 " + count;
+        stats.textContent = "";
+      }
+
+      function saveDraftState() {
+        clearTimeout(draftSaveTimer);
+        updateStats();
+        try {
+          var article = currentArticle();
+          article.title = title.value;
+          article.html = content.innerHTML;
+          article.updatedAt = Date.now();
+          persistArticles();
+        } catch (error) {
+          showToast("图片较大，本次内容暂未保存");
+        }
+        updateStats();
+      }
+
+      function scheduleDraftSave() {
+        clearTimeout(draftSaveTimer);
+        updateStats();
+        draftSaveTimer = setTimeout(saveDraftState, 450);
+      }
+
+      async function restoreDocument() {
+        try {
+          var saved = currentArticle();
+          if (!saved) return;
+          title.value = typeof saved.title === "string" ? saved.title : "";
+          content.innerHTML = typeof saved.html === "string" ? saved.html : "";
+          var images = content.querySelectorAll("img[data-local-image-id]");
+          for (var i = 0; i < images.length; i += 1) {
+            var blob = await readLocalImage(images[i].getAttribute("data-local-image-id"));
+            if (blob) images[i].src = URL.createObjectURL(blob);
+          }
+        } catch (error) {}
+      }
+
+      function openImageDatabase() {
+        return new Promise(function (resolve, reject) {
+          var request = indexedDB.open("vibe-writing-local-content", 1);
+          request.onupgradeneeded = function () {
+            if (!request.result.objectStoreNames.contains("images")) {
+              request.result.createObjectStore("images");
+            }
+          };
+          request.onsuccess = function () { resolve(request.result); };
+          request.onerror = function () { reject(request.error); };
+        });
+      }
+
+      async function saveLocalImage(id, blob) {
+        var database = await openImageDatabase();
+        return new Promise(function (resolve, reject) {
+          var transaction = database.transaction("images", "readwrite");
+          transaction.objectStore("images").put(blob, id);
+          transaction.oncomplete = function () { resolve(); };
+          transaction.onerror = function () { reject(transaction.error); };
+        });
+      }
+
+      async function readLocalImage(id) {
+        if (!id) return null;
+        var database = await openImageDatabase();
+        return new Promise(function (resolve, reject) {
+          var request = database.transaction("images").objectStore("images").get(id);
+          request.onsuccess = function () { resolve(request.result || null); };
+          request.onerror = function () { reject(request.error); };
+        });
+      }
+
+      function rememberSelection() {
+        var selection = window.getSelection();
+        if (!selection || !selection.rangeCount || !content.contains(selection.anchorNode)) return;
+        savedSelection = selection.getRangeAt(0).cloneRange();
+      }
+
+      function restoreSelection() {
+        if (!savedSelection) return;
+        var selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(savedSelection);
+      }
+
+      function runFormat(command, value) {
+        content.focus();
+        restoreSelection();
+        document.execCommand(command, false, value || null);
+        rememberSelection();
+        saveDraftState();
+        updateToolbarState();
+      }
+
+      function updateToolbarState() {
+        ["bold", "italic", "insertUnorderedList"].forEach(function (command) {
+          var button = document.querySelector('[data-command="' + command + '"]');
+          if (button) button.classList.toggle("is-active", document.queryCommandState(command));
+        });
+      }
+
+      document.querySelectorAll("[data-theme-value]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          applyTheme(button.getAttribute("data-theme-value"));
+        });
+      });
+      settingsButton.addEventListener("click", openSettings);
+      articlesButton.addEventListener("click", openArticleDrawer);
+      contextButton.addEventListener("click", function () {
+        contextDrawerScrim.classList.add("is-open");
+        contextDrawerScrim.setAttribute("aria-hidden", "false");
+      });
+      document.getElementById("close-context").addEventListener("click", function () {
+        contextDrawerScrim.classList.remove("is-open");
+        contextDrawerScrim.setAttribute("aria-hidden", "true");
+      });
+      contextDrawerScrim.addEventListener("click", function (event) {
+        if (event.target === contextDrawerScrim) {
+          contextDrawerScrim.classList.remove("is-open");
+          contextDrawerScrim.setAttribute("aria-hidden", "true");
+        }
+      });
+      title.addEventListener("dblclick", openArticleDrawer);
+      document.getElementById("new-article").addEventListener("click", function () {
+        saveDraftState();
+        var article = makeArticle({});
+        articles.unshift(article);
+        currentArticleId = article.id;
+        persistArticles();
+        restoreDocument();
+        closeArticleDrawer();
+        title.focus();
+      });
+      articleSearch.addEventListener("input", function () {
+        renderArticleList(articleSearch.value.trim());
+      });
+      articleDrawerScrim.addEventListener("click", function (event) {
+        if (event.target === articleDrawerScrim) closeArticleDrawer();
+      });
+      document.querySelectorAll("[data-command]").forEach(function (button) {
+        button.addEventListener("mousedown", function (event) {
+          event.preventDefault();
+          runFormat(button.getAttribute("data-command"));
+        });
+      });
+      document.querySelectorAll("[data-block]").forEach(function (button) {
+        button.addEventListener("mousedown", function (event) {
+          event.preventDefault();
+          runFormat("formatBlock", button.getAttribute("data-block"));
+        });
+      });
+      document.getElementById("local-image").addEventListener("change", async function (event) {
+        var file = event.target.files && event.target.files[0];
+        if (!file) return;
+        try {
+          var id = "image-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+          await saveLocalImage(id, file);
+          var objectUrl = URL.createObjectURL(file);
+          content.focus();
+          restoreSelection();
+          document.execCommand("insertImage", false, objectUrl);
+          var inserted = content.querySelector('img[src="' + objectUrl + '"]');
+          if (inserted) inserted.setAttribute("data-local-image-id", id);
+          saveDraftState();
+          showToast("图片已插入，仅保存在本地");
+        } catch (error) {
+          showToast("图片保存失败");
+        }
+        event.target.value = "";
+      });
+      document.getElementById("cancel-settings").addEventListener("click", closeSettings);
+      document.getElementById("clear-key").addEventListener("click", function () {
+        apiKey.value = "";
+        localStorage.removeItem(storageKey);
+        showToast("API Key 已清除");
+        closeSettings();
+      });
+      document.getElementById("save-settings").addEventListener("click", function () {
+        var value = apiKey.value.trim();
+        var styleValue = stylePrompt.value.trim();
+        localStorage.setItem(themeStorageKey, selectedTheme);
+        localStorage.setItem(styleStorageKey, styleValue);
+        applyTheme(selectedTheme);
+        if (value) {
+          localStorage.setItem(storageKey, value);
+          showToast("设置已保存");
+        } else {
+          localStorage.removeItem(storageKey);
+          showToast("未填写 API Key");
+        }
+        closeSettings();
+      });
+      toggleKey.addEventListener("click", function () {
+        var reveal = apiKey.type === "password";
+        apiKey.type = reveal ? "text" : "password";
+        toggleKey.textContent = reveal ? "隐藏" : "显示";
+        toggleKey.setAttribute("aria-label", reveal ? "隐藏 API Key" : "显示 API Key");
+      });
+      settingsScrim.addEventListener("click", function (event) {
+        if (event.target === settingsScrim) closeSettings();
+      });
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && settingsScrim.classList.contains("is-open")) closeSettings();
+      });
+      document.getElementById("copy-button").addEventListener("click", function () {
+        navigator.clipboard && navigator.clipboard.writeText("# " + title.value + "\n\n" + content.innerText);
+        showToast("Markdown 已复制");
+      });
+      document.getElementById("accept-suggestion").addEventListener("click", function () {
+        showToast("原生 App 中会插入当前续写建议");
+      });
+      document.getElementById("voice-button").addEventListener("click", function () {
+        if (recordingActive) {
+          stopRecordingPreview();
+        } else {
+          startRecordingPreview();
+        }
+      });
+      stopRecording.addEventListener("click", function () {
+        stopRecordingPreview();
+      });
+      title.addEventListener("input", scheduleDraftSave);
+      content.addEventListener("input", scheduleDraftSave);
+      content.addEventListener("keyup", function () {
+        rememberSelection();
+        updateToolbarState();
+      });
+      content.addEventListener("mouseup", function () {
+        rememberSelection();
+        updateToolbarState();
+      });
+      content.addEventListener("focus", rememberSelection);
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+        if ((localStorage.getItem(themeStorageKey) || "system") === "system") applyTheme("system");
+      });
+
+      applyTheme(selectedTheme);
+      loadArticles();
+      restoreDocument().then(updateStats);
+    })();
+  </script>
+</body>
+</html>
